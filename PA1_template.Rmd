@@ -4,22 +4,62 @@ output:
   html_document:
     keep_md: true
 ---
+## Load required packages, then load the data
+```{r, echo=TRUE}
+library(dplyr)
+library(lattice) 
+activity<-read.csv(file = "activity.csv" )
+```
 
+##Calculating the total number of steps per day and plotting the histogram and outputting mean and median.
+What is mean total number of steps taken per day?
+```{r, echo=TRUE}
+stepday<-aggregate(activity$steps, list(activity$date), sum)
+stepday<-as.data.frame(stepday)
+colnames(stepday)<-c("Day", "Total_Steps")
+print(stepday)
 
-## Loading and preprocessing the data
+hist(stepday$Total_Steps, main="Histogram of Daily Steps", col="magenta", xlab="Steps")
 
-
-
-## What is mean total number of steps taken per day?
-
-
+mean(stepday$Total_Steps, na.rm=TRUE)
+median(stepday$Total_Steps, na.rm=TRUE)
+```
 
 ## What is the average daily activity pattern?
+``` {r, echo=TRUE}
+byinterval<-aggregate(activity$steps, list(activity$interval), mean, na.rm=TRUE)
+colnames(byinterval)<-c("Interval", "Mean_Steps")
+plot(byinterval,type="l", main="Time Series of Average Steps by Interval",      ylab="steps", xlab="Interval")
+byinterval[which.max(byinterval$Mean_Steps), "Interval"]
+```
 
 
+## Imputing missing values, using the mean steps at that time interval. Using looping in merge function. 
+```{r, echo=TRUE}
 
-## Imputing missing values
-
-
+merger<-merge(activity,byinterval, by.x="interval", by.y="Interval", all.x = TRUE)
+merger[is.na(merger$steps)!=FALSE,"steps"]<-merger[is.na(merger$steps), "Mean_Steps"]
+newdata<-select(merger, steps, date, interval)
+newdata.total<-aggregate(newdata$steps, by = list(newdata$date), FUN = sum)
+colnames(newdata.total)<-c("Day", "Total_Steps")
+hist(stepday$Total_Steps, main="Histogram of Daily Steps", col="green", xlab="Steps")
+mean(newdata.total$Total_Steps, na.rm = TRUE)
+median(newdata.total$Total_Steps, na.rm = TRUE)
+```
+So there doesn't appear to be much change in the mean or median after interpolating the NA values
 
 ## Are there differences in activity patterns between weekdays and weekends?
+```{r, echo=TRUE}
+newdata$Day<-as.Date(newdata$date, "%Y-%m-%d")
+newdata$weekday<-weekdays(newdata$Day)
+weekends<-filter(newdata, weekday=="Saturday"|weekday=="Sunday")
+weekends$weekend<-"Weekend"
+weekdays<-filter(newdata, weekday!="Saturday"& weekday!="Sunday")
+weekdays$weekend<-"Weekday"
+newdata2<-arrange(rbind(weekends,weekdays), Day)
+newdata2total<-aggregate(newdata2$steps, list(newdata2$interval, newdata2$weekend), mean)
+colnames(newdata2total)<-c("Interval","Weekend", "Mean_Steps")
+attach(newdata2total)
+xyplot(Mean_Steps ~ Interval | Weekend, type= "l", main="Average Steps during weekends and weekdays")
+```
+
